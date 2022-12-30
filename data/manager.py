@@ -75,17 +75,13 @@ class DataManager:
         except:
             return None
 
-    @classmethod
-    def _load(self, data_dir: str, data_id: str) -> PluginData:
-        data = PluginData.load(data_dir=data_dir, id=data_id, load_blob=False)
+    def load(self, data_id: str) -> PluginData:
+        data = PluginData.load(data_dir=self.data_dir, id=data_id, load_blob=False)
         if data.type not in self._data_name_lut:
             logging.error(f"[DataManager::load] unknow type {data.type}")
             return None
 
-        return self._data_name_lut[data.type].load(data_dir=data_dir, id=data_id)
-
-    def load(self, data_id: str) -> PluginData:
-        return self._load(self.data_dir, data_id)
+        return self._data_name_lut[data.type].load(data_dir=self.data_dir, id=data_id)
 
     def save(self, data):
         data.save(self.data_dir, save_blob=True)

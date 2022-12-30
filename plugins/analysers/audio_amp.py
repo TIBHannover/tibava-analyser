@@ -31,8 +31,8 @@ class AudioAmpAnalysis(
     requires=requires,
     provides=provides,
 ):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
 
     def call(self, inputs, parameters, callbacks=None):
 

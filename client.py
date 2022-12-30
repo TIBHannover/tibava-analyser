@@ -43,9 +43,11 @@ class AnalyserClient:
         self.host = host
         self.port = port
         self.manager = manager
+        print(f"{self.host}:{self.port}")
         self.channel = grpc.insecure_channel(f"{self.host}:{self.port}")
 
     def list_plugins(self):
+        print("LIST")
         stub = analyser_pb2_grpc.AnalyserStub(self.channel)
 
         response = stub.list_plugins(analyser_pb2.ListPluginsRequest())

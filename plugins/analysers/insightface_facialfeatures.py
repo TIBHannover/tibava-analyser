@@ -58,8 +58,8 @@ arcface_src = np.expand_dims(arcface_src, axis=0)
 
 
 class InsightfaceFeatureExtractor(AnalyserPlugin):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
         self.host = self.config["host"]
         self.port = self.config["port"]
         self.model_name = self.config["model_name"]
@@ -196,8 +196,8 @@ class InsightfaceVideoFeatureExtractor(
     requires=requires,
     provides=provides,
 ):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
 
     def call(self, inputs, parameters, callbacks=None):
         try:
@@ -273,8 +273,8 @@ class InsightfaceImageFeatureExtractor(
     requires=requires,
     provides=provides,
 ):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
 
     def call(self, inputs, parameters, callbacks=None):
         try:

@@ -45,10 +45,12 @@ class AnalyserPlugin(Plugin):
         cls._parameters = parameters
         cls._name = convert_name(cls.__name__)
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, datamanager=None, **kwargs):
         self._config = self._default_config
         if config is not None:
             self._config.update(config)
+
+        self._datamanager = datamanager
 
     @classmethod
     @property

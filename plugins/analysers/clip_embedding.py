@@ -252,8 +252,8 @@ class ClipImageEmbedding(
     requires=img_embd_requires,
     provides=img_embd_provides,
 ):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
         self.host = self.config["host"]
         self.port = self.config["port"]
         self.model_name = self.config["image_model_name"]
@@ -306,8 +306,8 @@ class ClipTextEmbedding(
     requires=text_embd_requires,
     provides=text_embd_provides,
 ):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
         self.host = self.config["host"]
         self.port = self.config["port"]
         self.model_name = self.config["text_model_name"]

@@ -24,8 +24,8 @@ import traceback
 
 
 class InsightfaceDetector(AnalyserPlugin):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
         self.host = self.config["host"]
         self.port = self.config["port"]
         self.model_name = self.config["model_name"]
@@ -362,8 +362,8 @@ class InsightfaceVideoDetector(
     requires=requires,
     provides=provides,
 ):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
 
     def call(self, inputs, parameters, callbacks=None):
         try:
@@ -417,8 +417,8 @@ class InsightfaceImageDetector(
     requires=requires,
     provides=provides,
 ):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
 
     def call(self, inputs, parameters, callbacks=None):
         try:

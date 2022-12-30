@@ -36,10 +36,15 @@ provides = {
 
 @AnalyserPluginManager.export("places_classifier")
 class PlacesClassifier(
-    AnalyserPlugin, config=default_config, parameters=default_parameters, version="0.1", requires=requires, provides=provides
+    AnalyserPlugin,
+    config=default_config,
+    parameters=default_parameters,
+    version="0.1",
+    requires=requires,
+    provides=provides,
 ):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
         self.host = self.config["host"]
         self.port = self.config["port"]
         self.model_name = self.config["model_name"]

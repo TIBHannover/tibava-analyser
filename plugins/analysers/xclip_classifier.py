@@ -20,11 +20,13 @@ default_config = {
     "model_device": "gpu",
     "model_file": "/models/xclip/xclip_kin600_16_8.onnx",
     "image_resolution": (224, 224),
-    "classes_file" : "/models/xclip/kinetics_600_labels.csv",
-    "seq_len" : 8,
+    "classes_file": "/models/xclip/kinetics_600_labels.csv",
+    "seq_len": 8,
 }
 
-default_parameters = {"fps" : 5, }
+default_parameters = {
+    "fps": 5,
+}
 
 requires = {
     "video": VideoData,
@@ -34,12 +36,18 @@ provides = {
     "logits": ListData,
 }
 
+
 @AnalyserPluginManager.export("xclip_classifier")
 class XCLIPClassifier(
-    AnalyserPlugin, config=default_config, parameters=default_parameters, version="0.1", requires=requires, provides=provides
+    AnalyserPlugin,
+    config=default_config,
+    parameters=default_parameters,
+    version="0.1",
+    requires=requires,
+    provides=provides,
 ):
-    def __init__(self, config=None):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        super().__init__(config, **kwargs)
         self.host = self.config["host"]
         self.port = self.config["port"]
         self.model_name = self.config["model_name"]
@@ -56,7 +64,7 @@ class XCLIPClassifier(
             host=self.host,
             port=self.port,
             device=self.model_device,
-            backend="ONNX"
+            backend="ONNX",
         )
 
     def read_classes(self, classes_file):
@@ -85,8 +93,8 @@ class XCLIPClassifier(
             frames.append(frame["frame"])
             if len(frames) == self.seq_len:
                 frames = np.stack(frames)
-                batch = np.transpose(frames, (0, 3, 1, 2)) # [T, C, H, W]
-                batch = np.expand_dims(batch, 0) # [B, T, C, H, W]
+                batch = np.transpose(frames, (0, 3, 1, 2))  # [T, C, H, W]
+                batch = np.expand_dims(batch, 0)  # [B, T, C, H, W]
 
                 res = self.server({"data": batch.astype(np.float32)}, ["logits"])["logits"]
                 logits.append(res)
@@ -101,14 +109,4 @@ class XCLIPClassifier(
 
         logits = np.concatenate(logits)
 
-        return {
-            "logits" : ListData(
-                data=[
-                    ScalarData(
-                        y=logits,
-                        time=time
-                    )
-                    ],
-                index=[self.classes]
-                )
-        }
+        return {"logits": ListData(data=[ScalarData(y=logits, time=time)], index=[self.classes])}
