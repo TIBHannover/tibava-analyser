@@ -100,7 +100,7 @@ class WhisperX(
         ) as output_data:
             with input_data.open_audio("r") as f_audio:
                 y, sr = librosa.load(f_audio, sr=16000)
-                transcription = self.model.transcribe(y, 8, parameters.get("language"))
+                transcription = self.model.transcribe(audio=y, batch_size=8, language=parameters.get("language", "de"))
                 aligned_transcription = whisperx.align(transcription["segments"], self.alignment_model, self.metadata, y, device, return_char_alignments=False)
                 #aligned_segments = aligned_transcription["segments"]
 
