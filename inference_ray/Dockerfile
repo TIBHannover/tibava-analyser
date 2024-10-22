@@ -3,6 +3,9 @@ FROM python:3.10
 
 WORKDIR /app/analyser/inference/
 
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update --fix-missing -y && apt install python3-pip npm git libsndfile1-dev  python3-numpy ffmpeg wget -y
+
 COPY ./requirements.txt /app/analyser/inference/
 RUN pip install -r requirements.txt
 
