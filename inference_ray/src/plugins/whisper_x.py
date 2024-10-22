@@ -54,8 +54,8 @@ def get_speaker_turns(speaker_segments, gap: float=0.01) -> Dict[str, list[Annot
 
 def get_model(device: str, config: Dict[str, Any]) -> Tuple[Any, Any, Any, Dict[str, Any]]:
     import whisperx  # type: ignore
-    model = whisperx.load_model("large-v3", device=device, compute_type="float16", language=config["language"])
-    diarize_model = whisperx.DiarizationPipeline(device=device)#use_auth_token=config['huggingface']['token'], device=device)
+    model = whisperx.load_model("large-v3", device=device, compute_type="float32", language=config["language"])  # TODO originally compute_type="float16" but not supported by m1. probably change back for production
+    diarize_model = whisperx.DiarizationPipeline(device=device)
     alignment_model, metadata = whisperx.load_align_model(language_code="de", device=device)
     return model, diarize_model, alignment_model, metadata
 
