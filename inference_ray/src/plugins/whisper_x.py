@@ -3,7 +3,7 @@ from analyser.data import AudioData, AnnotationData, Annotation  # type: ignore
 
 from analyser.data import DataManager, Data  # type: ignore
 
-from typing import Callable, Dict, Any, Tuple
+from typing import Callable, Dict
 import logging
 
 default_config = {
@@ -12,7 +12,7 @@ default_config = {
     "port": 6379,
 }
 
-default_parameters = {"language": "de"}
+default_parameters = {"language_code": None}
 
 requires = {
     "audio": AudioData,
@@ -24,40 +24,33 @@ provides = {
 
 def get_speaker_turns(speaker_segments, gap: float=0.01) -> Dict[str, list[Annotation]]:
     speaker_turns = []
-    speakers = {}
-
-    last_segment = None
     for segment in sorted(speaker_segments, key=lambda x: x["start"]):
-        current_segment = {
+        spk_turn_segment = {
             "start": segment["start"],
             "end": segment["end"],
-            "labels": segment.get("text", "").strip(),
+            "text": segment.get("text", "").strip(),
             "speaker": segment.get("speaker", "Unknown"),
         }
-        if last_segment:
-            if last_segment["speaker"] == current_segment["speaker"]:
-                last_segment["end"] = current_segment["end"]
-                last_segment["labels"] += " " + current_segment["labels"]
+        
+        if not speaker_turns:
+            speaker_turns.append(spk_turn_segment)
+        else:
+            last_turn = speaker_turns[-1]
+            if last_turn["speaker"] == spk_turn_segment["speaker"]:
+                last_turn["end"] = spk_turn_segment["end"]
+                last_turn["text"] += " " + spk_turn_segment["text"]
             else:
-                if current_segment["start"] - last_segment["end"] <= gap:
-                    current_segment["start"] = last_segment["end"] + gap
-                speaker_turns.append(current_segment)
-                
-        last_segment = current_segment
-    
+                if spk_turn_segment["start"] - last_turn["end"] <= gap:
+                    spk_turn_segment["start"] = last_turn["end"] + gap
+                speaker_turns.append(spk_turn_segment)
+
+    speakers = {}
     for turn in speaker_turns:
         if not turn["speaker"] in speakers.keys():
             speakers[turn["speaker"]] = []
-        speakers[turn["speaker"]].append(Annotation(start=turn["start"], end=turn["end"], labels=turn["labels"]))
-    
+        speakers[turn["speaker"]].append(Annotation(start=turn["start"], end=turn["end"], labels=[turn["text"]]))
     return speakers
 
-def get_model(device: str, config: Dict[str, Any]) -> Tuple[Any, Any, Any, Dict[str, Any]]:
-    import whisperx  # type: ignore
-    model = whisperx.load_model("large-v3", device=device, compute_type="float32", language=config["language"])  # TODO originally compute_type="float16" but not supported by m1. probably change back for production
-    diarize_model = whisperx.DiarizationPipeline(device=device)
-    alignment_model, metadata = whisperx.load_align_model(language_code="de", device=device)
-    return model, diarize_model, alignment_model, metadata
 
 @AnalyserPluginManager.export("whisper_x")
 class WhisperX(
@@ -74,6 +67,8 @@ class WhisperX(
         # self.server = InferenceServer.build(inference_config.get("type"), inference_config.get("params", {}))
 
         self.model = None
+        self.diarize_model = None
+        self.alignment_model = None
         self.model_name = self.config.get("model", "whisper_x")
 
     def call(
@@ -89,10 +84,8 @@ class WhisperX(
 
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
         if self.model is None:
-            self.model, self.diarize_model, self.alignment_model, self.metadata = get_model(
-                config=parameters, # TODO
-                device=device,
-            )
+            self.model = whisperx.load_model("large-v3", device=device, compute_type="int8", language=parameters.get("language_code"))  # TODO originally compute_type="float16" but not supported by m1. probably change back for production
+            self.diarize_model = whisperx.DiarizationPipeline(device=device)
             self.device = device
 
         with inputs["audio"] as input_data, data_manager.create_data(
@@ -100,9 +93,12 @@ class WhisperX(
         ) as output_data:
             with input_data.open_audio("r") as f_audio:
                 y, sr = librosa.load(f_audio, sr=16000)
-                transcription = self.model.transcribe(audio=y, batch_size=8, language=parameters.get("language", "de"))
+                transcription = self.model.transcribe(audio=y, batch_size=8, language=parameters.get("language_code"))
+
+                # always instantiate new alignment model to match current language
+                self.alignment_model, self.metadata = whisperx.load_align_model(language_code=transcription["language"], device=device)
+
                 aligned_transcription = whisperx.align(transcription["segments"], self.alignment_model, self.metadata, y, device, return_char_alignments=False)
-                #aligned_segments = aligned_transcription["segments"]
 
                 diarize_segments = self.diarize_model(y)
                 speaker_transcription = whisperx.assign_word_speakers(diarize_segments, aligned_transcription)
