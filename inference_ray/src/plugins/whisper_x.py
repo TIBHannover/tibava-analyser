@@ -22,7 +22,10 @@ provides = {
     "annotations": AnnotationData,
 }
 
-def get_speaker_turns(speaker_segments, gap: float=0.01) -> Dict[str, list[Annotation]]:
+
+def get_speaker_turns(
+    speaker_segments, gap: float = 0.01
+) -> Dict[str, list[Annotation]]:
     speaker_turns = []
     for segment in sorted(speaker_segments, key=lambda x: x["start"]):
         spk_turn_segment = {
@@ -31,7 +34,7 @@ def get_speaker_turns(speaker_segments, gap: float=0.01) -> Dict[str, list[Annot
             "text": segment.get("text", "").strip(),
             "speaker": segment.get("speaker", "Unknown"),
         }
-        
+
         if not speaker_turns:
             speaker_turns.append(spk_turn_segment)
         else:
@@ -48,7 +51,9 @@ def get_speaker_turns(speaker_segments, gap: float=0.01) -> Dict[str, list[Annot
     for turn in speaker_turns:
         if not turn["speaker"] in speakers.keys():
             speakers[turn["speaker"]] = []
-        speakers[turn["speaker"]].append(Annotation(start=turn["start"], end=turn["end"], labels=[turn["text"]]))
+        speakers[turn["speaker"]].append(
+            Annotation(start=turn["start"], end=turn["end"], labels=[turn["text"]])
+        )
     return speakers
 
 
@@ -84,7 +89,12 @@ class WhisperX(
 
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
         if self.model is None:
-            self.model = whisperx.load_model("large-v3", device=device, compute_type="int8", language=parameters.get("language_code"))  # TODO originally compute_type="float16" but not supported by m1. probably change back for production
+            self.model = whisperx.load_model(
+                "large-v3",
+                device=device,
+                compute_type="int8",
+                language=parameters.get("language_code"),
+            )  # TODO originally compute_type="float16" but not supported by m1. probably change back for production
             self.diarize_model = whisperx.DiarizationPipeline(device=device)
             self.device = device
 
@@ -93,15 +103,28 @@ class WhisperX(
         ) as output_data:
             with input_data.open_audio("r") as f_audio:
                 y, sr = librosa.load(f_audio, sr=16000)
-                transcription = self.model.transcribe(audio=y, batch_size=8, language=parameters.get("language_code"))
+                transcription = self.model.transcribe(
+                    audio=y, batch_size=8, language=parameters.get("language_code")
+                )
 
                 # always instantiate new alignment model to match current language
-                self.alignment_model, self.metadata = whisperx.load_align_model(language_code=transcription["language"], device=device)
+                self.alignment_model, self.metadata = whisperx.load_align_model(
+                    language_code=transcription["language"], device=device
+                )
 
-                aligned_transcription = whisperx.align(transcription["segments"], self.alignment_model, self.metadata, y, device, return_char_alignments=False)
+                aligned_transcription = whisperx.align(
+                    transcription["segments"],
+                    self.alignment_model,
+                    self.metadata,
+                    y,
+                    device,
+                    return_char_alignments=False,
+                )
 
                 diarize_segments = self.diarize_model(y)
-                speaker_transcription = whisperx.assign_word_speakers(diarize_segments, aligned_transcription)
+                speaker_transcription = whisperx.assign_word_speakers(
+                    diarize_segments, aligned_transcription
+                )
                 speaker_turns = get_speaker_turns(speaker_transcription["segments"])
 
                 for speaker, annotations in speaker_turns.items():
