@@ -1,5 +1,5 @@
 from analyser.inference.plugin import AnalyserPlugin, AnalyserPluginManager  # type: ignore
-from analyser.data import AudioData, AnnotationData, Annotation  # type: ignore
+from analyser.data import AudioData, AnnotationData, ListData, Annotation  # type: ignore
 
 from analyser.data import DataManager, Data  # type: ignore
 
@@ -19,7 +19,7 @@ requires = {
 }
 
 provides = {
-    "annotations": AnnotationData,
+    "annotations": ListData,
 }
 
 
@@ -83,9 +83,9 @@ class WhisperX(
         parameters: Dict = None,
         callbacks: Callable = None,
     ) -> Dict[str, Data]:
-        import librosa  # type: ignore
+        import librosa
         import torch
-        import whisperx  # type: ignore
+        import whisperx
 
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
         if self.model is None:
