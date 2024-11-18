@@ -1,17 +1,18 @@
-from typing import List, Any, Tuple
+from typing import List, Any, Tuple, Callable, Dict
+from pathlib import Path
 
 from analyser.inference.plugin import AnalyserPlugin, AnalyserPluginManager  # type: ignore
 from analyser.data import AudioData, AnnotationData, ListData, Annotation  # type: ignore
 
 from analyser.data import DataManager, Data  # type: ignore
 
-from typing import Callable, Dict
 import logging
 
 default_config = {
     "data_dir": "/data/",
     "host": "localhost",
     "port": 6379,
+    "save_dir": Path("/models/audio_speaker/"),
 }
 
 default_parameters = {}
@@ -77,21 +78,24 @@ class AudioSpeakerAnalysis(
                 pymodule_file="custom_interface.py",
                 classname="CustomEncoderWav2vec2Classifier",
                 run_opts=run_opts,
+                savedir=self.config.get("save_dir"),
             )
             gen_model = Wav2Vec2ForSequenceClassification.from_pretrained(
-                "alefiury/wav2vec2-large-xlsr-53-gender-recognition-librispeech"
+                "alefiury/wav2vec2-large-xlsr-53-gender-recognition-librispeech",
+                cache_dir=self.config.get("save_dir"),
             )
             gen_proc = Wav2Vec2FeatureExtractor.from_pretrained(
-                "alefiury/wav2vec2-large-xlsr-53-gender-recognition-librispeech"
+                "alefiury/wav2vec2-large-xlsr-53-gender-recognition-librispeech",
+                cache_dir=self.config.get("save_dir"),
             )
-            #TODO change model saving directory
+            # TODO wav2vec models are still saved in plugins/
             gen_model.to(device)
             gen_model.eval()
             return emo_model, gen_model, gen_proc
 
         def classify_segments(
             audio_array: np.ndarray,
-            speaker_turns: List[Dict[str, Any]],
+            speaker_turns: List[Annotation],
             sampling_rate: int,
         ) -> Tuple[List[Annotation], List[Annotation]]:
             """
@@ -99,7 +103,7 @@ class AudioSpeakerAnalysis(
 
             Args:
                 audio_array (np.ndarray): Loaded audio series
-                speaker_turns (List[Dict[str, Any]]): List of speaker segments from ASR
+                speaker_turns (List[Annotation]): List of speaker segments from ASR
                 sampling_rate (int): Sampling rate of audio_array
 
             Returns:
