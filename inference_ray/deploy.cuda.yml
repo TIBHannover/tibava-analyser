@@ -582,6 +582,25 @@ applications:
               - torch==2.2.0
               - transformers==4.37.2
               - speechbrain==1.0.2
+  - name: audio_classification
+    route_prefix: /audio_classification
+    import_path: main:app_builder
+    args:
+      model: audio_classification
+      data_path: /data
+      params: {}
+    deployments:
+      - name: Deployment
+        autoscaling_config:
+          min_replicas: 0
+        ray_actor_options:
+          num_cpus: 2
+          runtime_env:
+            pip:
+              - librosa==0.10.1
+              - torch==2.2.0
+              - torchaudio # TODO specify version
+
 
   - name: x_clip_video_embedding
     route_prefix: /x_clip_video_embedding
