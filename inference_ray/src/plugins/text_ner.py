@@ -427,7 +427,7 @@ class NamedEntityRecognition(
             nlp = stanza.Pipeline(
                 lang=language_code,
                 dir=str(self.config.get("save_dir")),
-                processors="tokenize,ner,pos",
+                processors="tokenize,ner",
                 use_gpu=True,
             )
 
