@@ -495,7 +495,7 @@ class NamedEntityRecognition(
         with inputs["annotations"] as input_annotations, data_manager.create_data(
             "AnnotationData"
         ) as output_data:
-            output_data.name = "Named Entity Recognition"
+            output_data.name = "Named Entity Recognition and Disambiguation"
             for _, speaker_data in input_annotations:
                 with speaker_data as speaker_data:
                     predictions = classify_segments(
