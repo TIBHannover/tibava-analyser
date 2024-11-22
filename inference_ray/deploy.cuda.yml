@@ -600,6 +600,23 @@ applications:
               - librosa==0.10.1
               - torch==2.2.0
               - torchaudio # TODO specify version
+  - name: text_ner
+    route_prefix: /text_ner
+    import_path: main:app_builder
+    args:
+      model: text_ner
+      data_path: /data
+      params: {}
+    deployments:
+      - name: Deployment
+        autoscaling_config:
+          min_replicas: 0
+        ray_actor_options:
+          num_cpus: 2
+          runtime_env:
+            pip:
+              - requests==2.28.2
+              - stanza==1.9.2
 
 
   - name: x_clip_video_embedding
