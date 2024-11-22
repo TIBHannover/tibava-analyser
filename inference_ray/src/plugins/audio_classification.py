@@ -110,7 +110,7 @@ class AudioClassification(
 
         def classify_segments(
             audio_array: np.ndarray, segments: List[Annotation], sampling_rate: int
-        ) -> List[Dict[str, Any]]:
+        ) -> List[Annotation]:
             """
             Takes Shot or Speaker Turn Segments and classifies them into audio categories
 
@@ -213,7 +213,6 @@ class AudioClassification(
                 sampling_rate = 16000
                 audio_array, _ = librosa.load(audio_file, sr=sampling_rate)
                 if parameters.get("segment_type") == "Shot":
-                    logging.error(f"{input_annotations=}")
                     predictions = classify_segments(
                         audio_array, input_annotations, sampling_rate
                     )
@@ -224,9 +223,7 @@ class AudioClassification(
 
                 elif parameters.get("segment_type") == "Speaker":
                     for _, speaker_data in input_annotations:
-                        logging.error(f"1 {speaker_data=}")
                         with speaker_data as speaker_data:
-                            logging.error(f"2 {speaker_data=}")
                             predictions = classify_segments(
                                 audio_array, speaker_data.annotations, sampling_rate
                             )
