@@ -617,7 +617,22 @@ applications:
             pip:
               - requests==2.28.2
               - stanza==1.9.2
-
+  - name: text_pos
+    route_prefix: /text_pos
+    import_path: main:app_builder
+    args:
+      model: text_pos
+      data_path: /data
+      params: {}
+    deployments:
+      - name: Deployment
+        autoscaling_config:
+          min_replicas: 0
+        ray_actor_options:
+          num_cpus: 2
+          runtime_env:
+            pip:
+              - stanza==1.9.2
 
   - name: x_clip_video_embedding
     route_prefix: /x_clip_video_embedding
