@@ -419,6 +419,27 @@ applications:
           runtime_env:
             pip:
               - torch==2.2.0
+
+  - name: shot_angle
+    route_prefix: /shot_angle
+    import_path: main:app_builder
+    args:
+      model: shot_angle
+      data_path: /data
+      params: {}
+    deployments:
+      - name: Deployment
+        autoscaling_config:
+          min_replicas: 0
+        ray_actor_options:
+          num_cpus: 2
+          num_cpus: 2
+          runtime_env:
+            pip:
+              - torch==2.2.0
+              - torchvision
+              - transformers
+
   - name: thumbnail_generator
     route_prefix: /thumbnail_generator
     import_path: main:app_builder
