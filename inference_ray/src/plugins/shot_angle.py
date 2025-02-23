@@ -1,11 +1,11 @@
 from analyser.inference.plugin import AnalyserPlugin, AnalyserPluginManager
-from analyser.data import Annotation, AnnotationData, ShotsData, VideoData
+from analyser.data import ScalarData, VideoData, ListData
 
 from analyser.data import DataManager, Data
 from analyser.utils import VideoDecoder
 
 import logging
-from typing import Callable, Dict
+from typing import Callable, Dict, List
 
 
 default_config = {
@@ -22,11 +22,10 @@ default_parameters = {
 
 requires = {
     "video": VideoData,
-    "shots": ShotsData,
 }
 
 provides = {
-    "annotations": AnnotationData,
+    "probs": ListData,
 }
 
 
@@ -71,42 +70,44 @@ class ShotAngle(
         model.to(device)
         model.eval()
 
-        with inputs["video"] as video_data, inputs["shots"] as shot_data:
+        def get_probs(_batch: List[np.ndarray]) -> List[List[float]]:
+            batch = torch.from_numpy(np.stack(_batch, axis=0))
+            batch = batch.permute((0, 3, 1, 2))
+            inputs = transform(batch).to(device)
+            with torch.no_grad():
+                outputs = model(inputs).logits
+            return torch.softmax(outputs, dim=1).tolist()
+
+        with inputs["video"] as video_data:
             with video_data.open_video() as f_video, data_manager.create_data(
-                "AnnotationData"
-            ) as annotation_data:
+                "ListData"
+            ) as probs_data:
                 video_decoder = VideoDecoder(
                     path=f_video, extension=f".{video_data.ext}", fps=parameters["fps"]
                 )
 
-                for j, shot in enumerate(shot_data.shots):
-                    start_index = int(video_decoder.fps() * shot.start)
-                    end_index = int(video_decoder.fps() * shot.end)
-
-                    shot_preds = []
-                    _batch = []
-                    for i, _frame in enumerate(video_decoder):
-                        _batch.append(_frame.get("frame"))
-                        if (
-                            i + 1 == parameters["batch_size"]
-                            or i >= end_index - start_index
-                        ):
-                            batch = torch.from_numpy(np.stack(_batch, axis=0))
-                            batch = batch.permute((0, 3, 1, 2))
-                            inputs = transform(batch).to(device)
-                            with torch.no_grad():
-                                outputs = model(inputs).logits
-
-                            preds = torch.argmax(outputs, dim=1).cpu().numpy().tolist()
-                            shot_preds.extend(model.config.id2label[p] for p in preds)
-                            _batch = []
-                        if i >= end_index - start_index:
-                            break
-
-                    annotation_data.annotations.append(
-                        Annotation(start=shot.start, end=shot.end, labels=shot_preds)
+                _batch = []
+                times = []
+                probs = []
+                for i, _frame in enumerate(video_decoder):
+                    _batch.append(_frame.get("frame"))
+                    times.append(i / video_decoder.fps())
+                    if i + 1 == parameters["batch_size"]:
+                        probs.extend(get_probs(_batch))
+                        _batch = []
+                    self.update_callbacks(
+                        callbacks,
+                        progress=i / video_decoder.duration() * video_decoder.fps(),
                     )
-                    self.update_callbacks(callbacks, progress=j / len(shot_data.shots))
+                if len(_batch):
+                    probs.extend(get_probs(_batch))
 
-        self.update_callbacks(callbacks, progress=1.0)
-        return {"annotations": annotation_data}
+                index = list(model.config.id2label.values())
+                for i, y in zip(index, zip(*probs)):
+                    with probs_data.create_data("ScalarData", index=i) as scalar_data:
+                        scalar_data.y = np.asarray(y)
+                        scalar_data.time = times
+                        scalar_data.delta_time = 1 / parameters.get("fps")
+
+            self.update_callbacks(callbacks, progress=1.0)
+            return {"probs": probs_data}
