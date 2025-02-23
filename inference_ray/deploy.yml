@@ -418,6 +418,23 @@ applications:
           min_replicas: 0
         ray_actor_options:
           num_cpus: 2
+          runtime_env:
+            pip:
+              - torch==2.2.0
+              - torchvision
+              - transformers
+  - name: shot_level
+    route_prefix: /shot_level
+    import_path: main:app_builder
+    args:
+      model: shot_level
+      data_path: /data
+      params: {}
+    deployments:
+      - name: Deployment
+        autoscaling_config:
+          min_replicas: 0
+        ray_actor_options:
           num_cpus: 2
           runtime_env:
             pip:
