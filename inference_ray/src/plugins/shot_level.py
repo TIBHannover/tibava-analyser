@@ -92,12 +92,12 @@ class ShotLevel(
                 for i, _frame in enumerate(video_decoder):
                     _batch.append(_frame.get("frame"))
                     times.append(i / video_decoder.fps())
-                    if i + 1 == parameters["batch_size"]:
+                    if len(_batch) == parameters["batch_size"]:
                         probs.extend(get_probs(_batch))
                         _batch = []
                     self.update_callbacks(
                         callbacks,
-                        progress=i / video_decoder.duration() * video_decoder.fps(),
+                        progress=i / video_decoder.fps() / video_decoder.duration(),
                     )
                 if len(_batch):
                     probs.extend(get_probs(_batch))
