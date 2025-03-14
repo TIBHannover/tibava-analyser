@@ -6,9 +6,7 @@ from analyser.data import DataManager, Data
 import logging
 
 import numpy as np
-import os
-import subprocess
-from typing import Callable, Any, Dict, List, Optional
+from typing import Callable, Any, Dict, List
 from collections import defaultdict
 
 default_config = {
@@ -28,7 +26,7 @@ default_parameters = {
 
 requires = {
     "bboxes": BboxesData,
-    "faces": FacesData, # TODO does not contain any information? remove
+    "faces": FacesData,  # TODO does not contain any information? remove
     "shots": ShotsData,
 }
 
@@ -133,17 +131,6 @@ class FaceTracker(
         x, y, w, h = _bbox["x"], _bbox["y"], _bbox["w"], _bbox["h"]
         return [x, y, x + w, y + h]
 
-    def normalize_to_pixel(
-        self, bbox: Dict[str, float], frame_width: int, frame_height: int
-    ) -> List[float]:
-        """unused"""
-        x, y, w, h = bbox["x"], bbox["y"], bbox["w"], bbox["h"]
-        x1 = x * frame_width
-        y1 = y * frame_height
-        x2 = (x + w) * frame_width
-        y2 = (y + h) * frame_height
-        return [x1, y1, x2, y2]
-
     def track_shot(
         self, params: Dict[str, Any], shotFaces: List[List[Dict[str, Any]]]
     ) -> List[Dict[str, Any]]:
@@ -202,99 +189,3 @@ class FaceTracker(
 
                     tracks.append(enhanced_track)
         return tracks
-
-    def crop_video(
-        self,
-        params: Dict[str, Any],
-        track: Dict[str, Any],
-        vr: List[np.ndarray],
-        fps: float,
-        cropFile: str,
-        audioFilePath: Optional[str] = None,
-    ) -> str:
-        """
-        unused
-        Important: expects bboxes in x1y1x2y2 format
-
-        returns video file path
-        """
-        from scipy import signal
-        import cv2
-
-        fp = cropFile + ".avi"
-        if audioFilePath:
-            fp = cropFile + "t.avi"
-        vOut = cv2.VideoWriter(fp, cv2.VideoWriter_fourcc(*"XVID"), fps, (224, 224))
-
-        dets = {"x": [], "y": [], "s": []}
-        for det in track["bbox"]:
-            dets["s"].append(max((det[3] - det[1]), (det[2] - det[0])) / 2)
-            dets["y"].append((det[1] + det[3]) / 2)
-            dets["x"].append((det[0] + det[2]) / 2)
-
-        dets["s"] = np.array(signal.medfilt(dets["s"], kernel_size=13))
-        dets["x"] = np.array(signal.medfilt(dets["x"], kernel_size=13))
-        dets["y"] = np.array(signal.medfilt(dets["y"], kernel_size=13))
-
-        cs = params["crop_scale"]
-        frame_nums = np.array(track["frame"])
-
-        for fidx, frame_num in enumerate(frame_nums):
-            image = cv2.cvtColor(vr[frame_num], cv2.COLOR_RGB2BGR)
-
-            bs = dets["s"][fidx]
-            my = dets["y"][fidx]
-            mx = dets["x"][fidx]
-
-            y1 = int(my - bs)
-            y2 = int(my + bs * (1 + 2 * cs))
-            x1 = int(mx - bs * (1 + cs))
-            x2 = int(mx + bs * (1 + cs))
-
-            pad_top = max(0, -y1)
-            pad_bottom = max(0, y2 - image.shape[0])
-            pad_left = max(0, -x1)
-            pad_right = max(0, x2 - image.shape[1])
-
-            if pad_top > 0 or pad_bottom > 0 or pad_left > 0 or pad_right > 0:
-                image = cv2.copyMakeBorder(
-                    image,
-                    pad_top,
-                    pad_bottom,
-                    pad_left,
-                    pad_right,
-                    cv2.BORDER_CONSTANT,
-                    value=[110, 110, 110],
-                )
-
-            crop_y1 = max(0, y1 + pad_top)
-            crop_y2 = min(image.shape[0], y2 + pad_top)
-            crop_x1 = max(0, x1 + pad_left)
-            crop_x2 = min(image.shape[1], x2 + pad_left)
-
-            face = image[crop_y1:crop_y2, crop_x1:crop_x2]
-            face_resized = cv2.resize(face, (224, 224))
-
-            vOut.write(face_resized)
-
-        vOut.release()
-        if audioFilePath:
-            subaudioFilePath = cropFile + ".wav"
-            audioStart = frame_nums[0] / fps
-            audioEnd = (frame_nums[-1] + 1) / fps
-
-            command = (
-                f"ffmpeg -y -i {audioFilePath} -async 1 -ac 1 -vn -acodec pcm_s16le -ar 16000 -threads {params['workers']} "
-                f"-ss {audioStart:.3f} -to {audioEnd:.3f} {subaudioFilePath} -loglevel panic"
-            )
-            subprocess.call(command, shell=True)
-
-            command = (
-                f"ffmpeg -y -i {cropFile}t.avi -threads {params['workers']} "  # -i {subaudioFilePath} removed
-                f"-c:v copy -c:a copy {cropFile}.avi -loglevel panic"
-            )
-            subprocess.call(command, shell=True)
-
-            os.remove(cropFile + "t.avi")
-
-        return cropFile + ".avi"
