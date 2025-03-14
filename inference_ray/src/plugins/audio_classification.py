@@ -1,9 +1,9 @@
-from typing import List, Any, Tuple, Callable, Dict
+from typing import List, Tuple, Callable, Dict
 from pathlib import Path
 import sys
 
 from analyser.inference.plugin import AnalyserPlugin, AnalyserPluginManager  # type: ignore
-from analyser.data import AudioData, AnnotationData, ListData, Annotation  # type: ignore
+from analyser.data import AudioData, ListData, Annotation  # type: ignore
 
 from analyser.data import DataManager, Data  # type: ignore
 
@@ -24,6 +24,14 @@ requires = {
 }
 
 provides = {"annotations": ListData}
+
+"""
+Additional files needed in data/models/audio_classification/
+ontology.json: from fakenarratives repo
+beats: git cloned and beats subfolder extracted from https://huggingface.co/spaces/fffiloni/SALMONN-7B-gradio/tree/677c0125de736ab92751385e1e8664cd03c2ce0d/beats (not available anymore)
+    original repo/folder: https://github.com/microsoft/unilm/tree/master/beats
+model from https://onedrive.live.com/?authkey=%21APLo1x9WFLcaKBI&id=6B83B49411CA81A7%2125955&cid=6B83B49411CA81A7&parId=root&parQt=sharedby&o=OneUp
+"""
 
 
 @AnalyserPluginManager.export("audio_classification")
@@ -64,7 +72,6 @@ class AudioClassification(
         def get_models() -> Tuple[BEATs, Dict[int, str]]:
             checkpoint = torch.load(
                 self.config.get("save_dir")
-                / "beats"
                 / "BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"
             )
             cfg = BEATsConfig(checkpoint["cfg"])
