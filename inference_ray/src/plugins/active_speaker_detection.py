@@ -124,16 +124,6 @@ class ActiveSpeakerDetection(
                         parameters["crop_scale"],
                     )
 
-                    vOut = cv2.VideoWriter(
-                        f'{track_data["track_id"]}.avi',
-                        cv2.VideoWriter_fourcc(*"XVID"),
-                        fps,
-                        (224, 224),
-                    )
-                    for f in face_video_frames:
-                        vOut.write(f)
-                    vOut.release()
-
                     videoFeature = []
                     for face in face_video_frames:
                         face = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
