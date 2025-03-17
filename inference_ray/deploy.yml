@@ -615,11 +615,30 @@ applications:
               - torch==2.2.0
               - scikit-learn==1.4.0
               - transformers==4.37.2
-  - name: audio_speaker_analysis
-    route_prefix: /audio_speaker_analysis
+  - name: audio_emotion
+    route_prefix: /audio_emotion
     import_path: main:app_builder
     args:
-      model: audio_speaker_analysis
+      model: audio_emotion
+      data_path: /data
+      params: {}
+    deployments:
+      - name: Deployment
+        autoscaling_config:
+          min_replicas: 0
+        ray_actor_options:
+          num_cpus: 2
+          runtime_env:
+            pip:
+              - librosa==0.10.1
+              - torch==2.2.0
+              - transformers==4.37.2
+              - speechbrain==1.0.2
+  - name: audio_gender
+    route_prefix: /audio_gender
+    import_path: main:app_builder
+    args:
+      model: audio_gender
       data_path: /data
       params: {}
     deployments:

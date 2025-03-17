@@ -2,7 +2,7 @@ from typing import List, Any, Tuple, Callable, Dict
 from pathlib import Path
 
 from analyser.inference.plugin import AnalyserPlugin, AnalyserPluginManager  # type: ignore
-from analyser.data import AudioData, AnnotationData, ListData, Annotation  # type: ignore
+from analyser.data import AudioData, ListData, AnnotationData, Annotation  # type: ignore
 
 from analyser.data import DataManager, Data  # type: ignore
 
@@ -12,7 +12,8 @@ default_config = {
     "data_dir": "/data/",
     "host": "localhost",
     "port": 6379,
-    "save_dir": Path("/models/audio_speaker/"),
+    "save_dir": Path("/models/audio_gender/"),
+    "label_map": {0: "female", 1: "male"},
 }
 
 default_parameters = {}
@@ -22,11 +23,13 @@ requires = {
     "annotations": ListData,
 }
 
-provides = {"gender_annotations": ListData, "emotion_annotations": ListData}
+provides = {
+    "annotations": AnnotationData,
+}
 
 
-@AnalyserPluginManager.export("audio_speaker_analysis")
-class AudioSpeakerAnalysis(
+@AnalyserPluginManager.export("audio_gender")
+class AudioGender(
     AnalyserPlugin,
     config=default_config,
     parameters=default_parameters,
@@ -36,22 +39,11 @@ class AudioSpeakerAnalysis(
 ):
     def __init__(self, config=None, **kwargs):
         super().__init__(config, **kwargs)
-        # inference_config = self.config.get("inference", None)
-        # self.server = InferenceServer.build(inference_config.get("type"), inference_config.get("params", {}))
 
-        self.emotion_model = None
         self.gender_model = None
         self.gender_processor = None
 
-        self.emotion_label_map: Dict[str, str] = {
-            "neu": "Neutral",
-            "hap": "Happy",
-            "ang": "Angry",
-            "sad": "Sad",
-        }
-        self.gender_label_map: Dict[str, str] = {"0": "Female", "1": "Male"}
-
-        self.model_name = self.config.get("model", "speaker_attribute_model")
+        self.model_name = self.config.get("model", "audio_gender_model")
 
     def call(
         self,
@@ -63,7 +55,6 @@ class AudioSpeakerAnalysis(
         import librosa
         import torch
         import numpy as np
-        from speechbrain.inference.interfaces import foreign_class
         from transformers import (
             Wav2Vec2FeatureExtractor,
             Wav2Vec2ForSequenceClassification,
@@ -71,15 +62,7 @@ class AudioSpeakerAnalysis(
 
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-        def get_models() -> Tuple[Any, Any, Any]:
-            run_opts = {"device": device}
-            emo_model = foreign_class(
-                source="speechbrain/emotion-recognition-wav2vec2-IEMOCAP",
-                pymodule_file="custom_interface.py",
-                classname="CustomEncoderWav2vec2Classifier",
-                run_opts=run_opts,
-                savedir=self.config.get("save_dir"),
-            )
+        def get_models() -> Tuple[Any, Any]:
             gen_model = Wav2Vec2ForSequenceClassification.from_pretrained(
                 "alefiury/wav2vec2-large-xlsr-53-gender-recognition-librispeech",
                 cache_dir=self.config.get("save_dir"),
@@ -91,7 +74,7 @@ class AudioSpeakerAnalysis(
             # TODO wav2vec models are still saved in plugins/
             gen_model.to(device)
             gen_model.eval()
-            return emo_model, gen_model, gen_proc
+            return gen_model, gen_proc
 
         def classify_segments(
             audio_array: np.ndarray,
@@ -99,7 +82,7 @@ class AudioSpeakerAnalysis(
             sampling_rate: int,
         ) -> Tuple[List[Annotation], List[Annotation]]:
             """
-            Takes Speaker Diarization segments and classifies them into speech emotion and gender categories.
+            Takes Speaker Diarization segments and classifies them into speech male and female.
 
             Args:
                 audio_array (np.ndarray): Loaded audio series
@@ -107,10 +90,9 @@ class AudioSpeakerAnalysis(
                 sampling_rate (int): Sampling rate of audio_array
 
             Returns:
-                Tuple[List[Annotation], List[Annotation]]: List of segment gender and emotion predictions
+                List[Annotation]: List of gender predictions
             """
             gender_predictions = []
-            emotion_predictions = []
 
             for seg in speaker_turns:
                 # slice audio of current segment
@@ -158,93 +140,44 @@ class AudioSpeakerAnalysis(
 
                 with torch.no_grad():
                     result = self.gender_model(input_values).logits.softmax(dim=1)
-                    sum_res = result.mean(dim=0)
-                    max_i = sum_res.detach().cpu().argmax().item()
-                    gen_prob = sum_res.detach().cpu().max().item()
-                    gen_pred = self.gender_label_map[str(max_i)]
+                    gender_probs = result.mean(dim=0)
 
-                    _, emo_prob, _, text_lab = self.emotion_model.classify_batch(
-                        audio_segments
-                    )
-
-                if len(text_lab) > 1:
-                    top_probs = (
-                        emo_prob.detach()
-                        .cpu()
-                        .topk(min(len(text_lab), 3))
-                        .values.tolist()
-                    )
-                    top_preds = [
-                        self.emotion_label_map[text_lab[i]]
-                        for i in emo_prob.detach()
-                        .cpu()
-                        .topk(min(len(text_lab), 3))
-                        .indices.tolist()
-                    ]
-                else:
-                    top_probs = [emo_prob.item()]
-                    top_preds = [self.emotion_label_map[text_lab[0]]]
-
+                prediction_idx = torch.argmax(gender_probs, dim=-1).item()
                 gender_predictions.append(
                     Annotation(
                         start=seg.start,
                         end=seg.end,
                         labels=[
                             {
-                                "gender_pred": gen_pred,
-                                "gender_prob": gen_prob,
+                                "gender_probs": gender_probs.tolist(),
+                                "gender_pred": default_config["label_map"][
+                                    prediction_idx
+                                ],
                             }
                         ],
                     )
                 )
-                emotion_predictions.append(
-                    Annotation(
-                        start=seg.start,
-                        end=seg.end,
-                        labels=[
-                            {
-                                "emotion_pred_top3": top_preds,
-                                "emotion_prob_top3": top_probs,
-                                "emotion_pred": top_preds[0],
-                            }
-                        ],
-                    )
-                )
+            return gender_predictions
 
-            return gender_predictions, emotion_predictions
-
-        if None in [self.emotion_model, self.gender_model, self.gender_processor]:
-            self.emotion_model, self.gender_model, self.gender_processor = get_models()
+        if None in [self.gender_model, self.gender_processor]:
+            self.gender_model, self.gender_processor = get_models()
 
         with inputs["audio"] as input_audio, inputs[
             "annotations"
         ] as input_annotations, data_manager.create_data(
-            "ListData"
-        ) as gender_output_data, data_manager.create_data(
-            "ListData"
-        ) as emotion_output_data:
+            "AnnotationData"
+        ) as annotation_data:
             with input_audio.open_audio("r") as audio_file:
                 sampling_rate = 16000
                 audio_array, _ = librosa.load(audio_file, sr=sampling_rate)
                 for _, speaker_data in input_annotations:
                     with speaker_data as speaker_data:
-                        gender_predictions, emotion_predictions = classify_segments(
+                        gender_predictions = classify_segments(
                             audio_array, speaker_data.annotations, sampling_rate
                         )
-
-                        with gender_output_data.create_data(
-                            "AnnotationData"
-                        ) as gender_ann_data:
-                            gender_ann_data.annotations.extend(gender_predictions)
-                            gender_ann_data.name = speaker_data.name
-                        with emotion_output_data.create_data(
-                            "AnnotationData"
-                        ) as emotion_ann_data:
-                            emotion_ann_data.annotations.extend(emotion_predictions)
-                            emotion_ann_data.name = speaker_data.name
+                        annotation_data.annotations.extend(gender_predictions)
 
                 self.update_callbacks(callbacks, progress=1.0)
                 return {
-                    "gender_annotations": gender_output_data,
-                    "emotion_annotations": emotion_output_data,
+                    "annotations": annotation_data,
                 }
