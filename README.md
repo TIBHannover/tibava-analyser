@@ -1,3 +1,7 @@
+# Archive
+
+We are developing TIB-AV-A further in a single project: https://github.com/TIBHannover/tibava
+
 # Description
 This is the inference backend to the [Tibava](https://github.com/TIBHannover/tibava).\
 This is where the actual machine learning models are running.
